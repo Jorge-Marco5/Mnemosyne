@@ -1,6 +1,9 @@
-from core.checkConnection.dbConnectionStrategy import DBConnectionStrategy, PostgreSQLStrategy, MySQLStrategy, SQLiteStrategy
+from core.connection.dbConnectionStrategy import DBConnectionStrategy
+from core.connection.engines.PostgreSQLStrategy import PostgreSQLStrategy
+from core.connection.engines.MySQLStrategy import MySQLStrategy
+from core.connection.engines.SQLIteStrategy import SQLiteStrategy
 
-class DatabaseChecker:
+class DatabaseConnectionChecker:
     def __init__(self):
         self._strategies = {
             "postgresql": PostgreSQLStrategy(),

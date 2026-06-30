@@ -1,13 +1,15 @@
 from core.data_service import DataService
 from simple_term_menu import TerminalMenu
-from core.checkConnection.databaseChecker import DatabaseChecker
+from core.connection.databaseChecker import DatabaseConnectionChecker
+from core.backups.databaseChecker import DatabaseBackupChecker
 from core.encrypt import encriptText, decriptText
 import uuid
 
 opciones=['postgresql','mysql','sqlite']
 
 data_service = DataService()
-database_checker = DatabaseChecker()
+database_checker = DatabaseConnectionChecker()
+database_backup_checker = DatabaseBackupChecker()
 
 def saveConfig(args):
     """
@@ -76,7 +78,6 @@ def listConfigs(args):
             return 1
         print(item)
 
-
 def updateConfig(args):
     """
     Actualiza una configuracion de base de datos guardada en el sistema
@@ -125,7 +126,6 @@ def updateConfig(args):
         print(res)
         return 0
 
-
 def deleteConfig(args):
     """
     Elimina una configuracion de base de datos guardada en el sistema
@@ -143,7 +143,6 @@ def deleteConfig(args):
         print("Configuracion de (", item[2], ") eliminada con exito")
         return 0
 
-
 def checkConnection(args):
     """
     Verifica la conexion de una base de datos
@@ -156,7 +155,7 @@ def checkConnection(args):
         if not data:
             print("Sin registros para ese alias")
             return 1
-        print("Verificando la conexion de la configuracion con el alias: ", args.alias)
+        print(f"Verificando la conexion con {data[1]} ({args.alias})...")
     item = data_service.show_info(data[0])
     passw = decriptText(item[6])
     status = database_checker.verify(item[1], item[3], item[4], item[5], passw, item[7])
@@ -190,19 +189,28 @@ def startBackup(args):
         print("Ingresa el alias de la configuracion a utilizar")
         return 1
     elif args.alias:
-        print("Iniciando copia de seguridad de la configuracion con el alias: ", args.alias)
-        data_service.add_log(args.alias, "postgresql", "full", 10, 5000, "success", "/backups", "local", None)
+        check = checkConnection(args)
+        if check != 0:
+            print("Conexion fallida")
+            return 1
+        print("\nIniciando copia de seguridad de la configuracion con el alias: ", args.alias)
+        db = data_service.show_one(args.alias)
+        data = data_service.show_info(db[0])
+        passw = decriptText(data[6])
+        check = database_backup_checker.verify(args.alias, data[1], data[3], data[4], data[5], passw, data[7])
+        print(f"\nCopia de seguridad de {args.alias} creada con exito.\nArchivo guardado en: ",check)
+        return 0
 
 def restoreBackup(args):
     """
     Restaura una copia de seguridad de base de datos en base a su ID o alias
     """
-    if not args.id and not args.alias:
+    if not args.date and not args.alias:
         print("Ingresa el ID o el alias de la copia de seguridad a restaurar")
         return 1
-    elif args.id:
-        print("Restaurando la copia de seguridad con el ID: ", args.id)
-        return 0
     elif args.alias:
         print("Restaurando la copia de seguridad con el alias: ", args.alias)
+        return 0
+    elif args.date:
+        print("Restaurando la copia de seguridad con fecha: ", args.date)
         return 0

@@ -1,11 +1,13 @@
 from core.data_service import DataService
 from simple_term_menu import TerminalMenu
-from core.encrypt import encriptText
+from core.checkConnection.databaseChecker import DatabaseChecker
+from core.encrypt import encriptText, decriptText
 import uuid
 
 opciones=['postgresql','mysql','sqlite']
 
-dataService = DataService()
+data_service = DataService()
+database_checker = DatabaseChecker()
 
 def saveConfig(args):
     """
@@ -44,7 +46,7 @@ def saveConfig(args):
                 'password': encriptText(password),
                 'db_name': db_name
             }
-            res = dataService.create_config(data)
+            res = data_service.create_config(data)
             print(res)
             return 0
         elif engine == 'sqlite':
@@ -62,13 +64,13 @@ def listConfigs(args):
     Lista todas las configuraciones de base de datos guardadas en el sistema
     """
     if not args.alias:
-        list = dataService.show_all()
+        list = data_service.show_all()
         if not list:
             print("No hay configuraciones guardadas")
             return 1
         print(list)
     elif args.alias:
-        item = dataService.show_one(args.alias)
+        item = data_service.show_one(args.alias)
         if not item:
             print("Sin registros")
             return 1
@@ -83,13 +85,14 @@ def updateConfig(args):
         print("Ingresa el alias de la configuracion a actualizar")
         return 1
     elif args.alias:
-        item = dataService.show_one(args.alias)
+        item = data_service.show_one(args.alias)
         if not item:
             print("Sin registros para ese alias")
             return 1
 
         print("Enter para mantener el valor actual\n")
-        engine_menu = TerminalMenu(opciones, title="Actualizar el motor de base de datos (" + item[1] + "): ")
+        opciones_update = ['default', 'postgresql', 'mysql', 'sqlite']
+        engine_menu = TerminalMenu(opciones_update, title="Actualizar el motor de base de datos (" + item[1] + "): ")
         engine_index = engine_menu.show()
         # TerminalMenu.show() may return None, an int, or a tuple (for multi-select).
         if engine_index is None:
@@ -100,7 +103,7 @@ def updateConfig(args):
                 print("Operación cancelada.")
                 return 1
             engine_index = engine_index[0]
-        new_engine = opciones[int(engine_index)]
+        new_engine = opciones_update[int(engine_index)]
 
         new_alias = input(f"actualizar el alias de la base de datos ({item[2]}): ")
         new_host = input(f"actualizar el host de la base de datos ({item[3]}): ")
@@ -110,7 +113,7 @@ def updateConfig(args):
 
         data = {
             'id': item[0],
-            'engine': new_engine if new_engine else item[1],
+            'engine': new_engine if new_engine != 'default' else item[1],
             'alias': new_alias if new_alias else item[2],
             'host': new_host if new_host else item[3],
             'port': new_port if new_port else item[4],
@@ -118,7 +121,7 @@ def updateConfig(args):
             'db_name': new_db_name if new_db_name else item[6]
         }
 
-        res = dataService.update(data)
+        res = data_service.update(data)
         print(res)
         return 0
 
@@ -132,14 +135,37 @@ def deleteConfig(args):
         return 1
     elif args.alias:
         print("Eliminando la configuracion con el alias: ", args.alias)
-        item = dataService.show_one(args.alias)
+        item = data_service.show_one(args.alias)
         if not item:
             print("No se encontro la configuracion con el alias: ", args.alias)
             return 1
-        dataService.delete(str(item[2]))
+        data_service.delete(str(item[2]))
         print("Configuracion de (", item[2], ") eliminada con exito")
         return 0
 
+
+def checkConnection(args):
+    """
+    Verifica la conexion de una base de datos
+    """
+    if not args.alias:
+        print("Ingresa el alias de la configuracion a verificar")
+        return 1
+    elif args.alias:
+        data = data_service.show_one(args.alias)
+        if not data:
+            print("Sin registros para ese alias")
+            return 1
+        print("Verificando la conexion de la configuracion con el alias: ", args.alias)
+    item = data_service.show_info(data[0])
+    passw = decriptText(item[6])
+    status = database_checker.verify(item[1], item[3], item[4], item[5], passw, item[7])
+    if status:
+        print("Conexion exitosa")
+        return 0
+    else:
+        print("Conexion fallida")
+    return 1
 
 def showHistory(args):
     """
@@ -153,7 +179,7 @@ def showHistory(args):
         print(f"Mostrando el historial con estado '{args.status}'")
     else:
         print("Mostrando el historial completo")
-    return dataService.show_logs(args.alias, args.status)
+    return data_service.show_logs(args.alias, args.status)
 
 
 def startBackup(args):
@@ -165,7 +191,7 @@ def startBackup(args):
         return 1
     elif args.alias:
         print("Iniciando copia de seguridad de la configuracion con el alias: ", args.alias)
-        dataService.add_log(args.alias, "postgresql", "full", 10, 5000, "success", "/backups", "local", None)
+        data_service.add_log(args.alias, "postgresql", "full", 10, 5000, "success", "/backups", "local", None)
 
 def restoreBackup(args):
     """

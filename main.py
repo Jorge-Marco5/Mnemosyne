@@ -1,4 +1,4 @@
-from core.core import saveConfig, listConfigs, updateConfig, deleteConfig, showHistory, startBackup, restoreBackup
+from core.core import saveConfig, listConfigs, updateConfig, deleteConfig, checkConnection, showHistory, startBackup, restoreBackup
 import argparse
 import sys
 
@@ -21,6 +21,10 @@ def main():
     parser_delete = subparsers.add_parser("delete", help="Elimina una configuracion guardada")
     parser_delete.add_argument("-a", "--alias", help="Alias de la configuracion a eliminar")
     parser_delete.set_defaults(func=deleteConfig)
+
+    parser_check = subparsers.add_parser("check", help="Verifica el estado de la conexion de una base de datos")
+    parser_check.add_argument("-a", "--alias", help="Alias de la configuracion a verificar")
+    parser_check.set_defaults(func=checkConnection)
 
     # Copias de seguridad de base de datos
     parser_history = subparsers.add_parser("history", help="Muestra el historial de copias de seguridad")

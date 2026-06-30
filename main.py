@@ -25,6 +25,7 @@ def main():
     # Copias de seguridad de base de datos
     parser_history = subparsers.add_parser("history", help="Muestra el historial de copias de seguridad")
     parser_history.add_argument("-a", "--alias", help="Muestra el historial de la configuracion especificada")
+    parser_history.add_argument("-s", "--status", help="Muestra el historial de copias de seguridad con el estado especificado")
     parser_history.set_defaults(func=showHistory)
 
     parser_start = subparsers.add_parser("start", help="Inicia una copia de seguridad")
@@ -32,8 +33,8 @@ def main():
     parser_start.set_defaults(func=startBackup)
 
     parser_restore = subparsers.add_parser("restore", help="Restaura una copia de seguridad")
-    parser_restore.add_argument("-i", "--id", help="ID de la copia de seguridad a restaurar")
     parser_restore.add_argument("-a", "--alias", help="Alias de la copia de seguridad a restaurar")
+    parser_restore.add_argument("-d", "--date", help="Fecha de la copia de seguridad a restaurar")
     parser_restore.set_defaults(func=restoreBackup)
                                           
     args = parser.parse_args()

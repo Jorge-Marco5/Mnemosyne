@@ -8,7 +8,7 @@ load_dotenv()
 
 # Ruta del archivo de historial
 DATA_PATH = os.getenv("DATA_PATH")
-HISTORY_FILE = Path(str(DATA_PATH), "history.db")
+HISTORY_FILE = Path(str(DATA_PATH), "data.db")
 
 class DataService:
     def __init__(self):
@@ -105,6 +105,15 @@ class DataService:
         )
         return cursor.fetchone()
 
+    def show_info_by_alias(self, alias: str):
+        """Obtiene una configuración completa por alias para funciones internas."""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "SELECT id, engine, alias, host, port, user, password, db_name FROM configs WHERE alias = ?",
+            (alias,)
+        )
+        return cursor.fetchone()
+
     def update(self, data: dict):
         """Actualiza una configuración existente en la tabla de configuraciones."""
         cursor = self.conn.cursor()
@@ -138,7 +147,7 @@ class DataService:
             cursor.execute("DELETE FROM configs WHERE alias = ?", (alias,))
             self.conn.commit()
             return True
-        except Exception as e:
+        except sqlite3.Error as e:
             print(f"Error al eliminar la configuracion: {e}")
             return False
 
@@ -190,6 +199,20 @@ class DataService:
 
         cursor.execute(query, params)
         return cursor.fetchall()
+
+    def get_latest_successful_backup(self, alias: str):
+        """
+        Obtiene el registro del último backup exitoso para un alias específico.
+        """
+        cursor = self.conn.cursor()
+        query = """
+            SELECT * FROM backup_history 
+            WHERE alias = ? AND status = 'SUCCESS'
+            ORDER BY timestamp DESC 
+            LIMIT 1
+        """
+        cursor.execute(query, (alias,))
+        return cursor.fetchone()
 
     def clear_history(self):
         """Elimina todos los registros del historial."""

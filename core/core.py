@@ -2,6 +2,7 @@ from core.data_service import DataService
 from simple_term_menu import TerminalMenu
 from core.connection.databaseChecker import DatabaseConnectionChecker
 from core.backups.databaseChecker import DatabaseBackupChecker
+from core.restore.databaseRestoreHandler import DatabaseRestoreHandler
 from core.encrypt import encriptText, decriptText
 import uuid
 
@@ -10,6 +11,7 @@ opciones=['postgresql','mysql','sqlite']
 data_service = DataService()
 database_checker = DatabaseConnectionChecker()
 database_backup_checker = DatabaseBackupChecker()
+database_restore_handler = DatabaseRestoreHandler()
 
 def saveConfig(args):
     """
@@ -54,6 +56,19 @@ def saveConfig(args):
         elif engine == 'sqlite':
             alias = input("Ingrese el alias de la base de datos: ")
             db_name = input("Ingrese el nombre del archivo de la base de datos: ")
+            data = {
+                'id': str(uuid.uuid4()),
+                'engine': engine,
+                'alias': alias,
+                'host': '',
+                'port': '',
+                'user': '',
+                'password': encriptText(''), # Encriptar un string vacío por consistencia
+                'db_name': db_name
+            }
+            res = data_service.create_config(data)
+            print(res)
+            return 0
         else:
             print("Motor de base de datos no soportado.")
             return 1
@@ -151,12 +166,11 @@ def checkConnection(args):
         print("Ingresa el alias de la configuracion a verificar")
         return 1
     elif args.alias:
-        data = data_service.show_one(args.alias)
-        if not data:
+        item = data_service.show_info_by_alias(args.alias) # Necesitaremos un nuevo método en DataService
+        if not item:
             print("Sin registros para ese alias")
             return 1
-        print(f"Verificando la conexion con {data[1]} ({args.alias})...")
-    item = data_service.show_info(data[0])
+        print(f"Verificando la conexion con {item[1]} ({args.alias})...")
     passw = decriptText(item[6])
     status = database_checker.verify(item[1], item[3], item[4], item[5], passw, item[7])
     if status:
@@ -194,8 +208,7 @@ def startBackup(args):
             print("Conexion fallida")
             return 1
         print("\nIniciando copia de seguridad de la configuracion con el alias: ", args.alias)
-        db = data_service.show_one(args.alias)
-        data = data_service.show_info(db[0])
+        data = data_service.show_info_by_alias(args.alias) # Reutilizamos el nuevo método
         passw = decriptText(data[6])
         check = database_backup_checker.verify(args.alias, data[1], data[3], data[4], data[5], passw, data[7])
         print(f"\nCopia de seguridad de {args.alias} creada con exito.\nArchivo guardado en: ",check)
@@ -205,12 +218,50 @@ def restoreBackup(args):
     """
     Restaura una copia de seguridad de base de datos en base a su ID o alias
     """
-    if not args.date and not args.alias:
-        print("Ingresa el ID o el alias de la copia de seguridad a restaurar")
+    if not args.alias:
+        print("Se requiere el alias de la configuración para la restauración.")
         return 1
-    elif args.alias:
-        print("Restaurando la copia de seguridad con el alias: ", args.alias)
-        return 0
-    elif args.date:
-        print("Restaurando la copia de seguridad con fecha: ", args.date)
-        return 0
+
+    # 1. Buscar el backup más reciente y exitoso para el alias dado
+    print(f"Buscando el último backup exitoso para el alias '{args.alias}'...")
+    # Usamos un nuevo método en DataService para esto
+    backup_log = data_service.get_latest_successful_backup(args.alias)
+    print(backup_log)
+    if not backup_log:
+        print(f"No se encontraron backups exitosos para el alias '{args.alias}'.")
+        return 1
+
+    print(f"Backup encontrado: ID {backup_log[0]} del {backup_log[2]}")
+    print(f"Archivo: {backup_log[9]}")
+
+    # 2. Obtener los detalles de la conexión para ese alias
+    config_data = data_service.show_info_by_alias(args.alias)
+    if not config_data:
+        print(f"Error: No se encontró la configuración para el alias '{args.alias}'.")
+        return 1
+
+    # 3. Pedir confirmación al usuario (¡MUY IMPORTANTE!)
+    print("\nADVERTENCIA: Esta operación sobreescribirá la base de datos actual.")
+    confirm = input(f"¿Estás seguro de que quieres restaurar la base de datos '{config_data[7]}' usando el backup del {backup_log[2]}? (s/N): ")
+    if confirm.lower() != 's':
+        print("Restauración cancelada.")
+        return 1
+
+    # 4. Ejecutar la restauración
+    try:
+        password = decriptText(config_data[6])
+        success = database_restore_handler.restore(
+            engine=config_data[1],
+            host=config_data[3],
+            port=config_data[4],
+            user=config_data[5],
+            password=password,
+            database=config_data[7],
+            backup_file=backup_log[9]
+        )
+        if success:
+            print("\n¡Restauración completada con éxito!")
+            return 0
+    except Exception as e:
+        print(f"\nError durante la restauración: {e}")
+        return 1

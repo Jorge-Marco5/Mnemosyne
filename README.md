@@ -1,118 +1,181 @@
 # Mnemosyne
 
-Herramienta CLI para poder realizar operaciones como copias de seguridad y restauracion de multiples bases de datos
+Herramienta CLI potente y robusta escrita en Python para gestionar copias de seguridad (backups) y restauraciones de múltiples bases de datos con soporte para almacenamiento local y servicios en la nube.
 
-Soporta multiples gestores de base de datos, asi como distintas formas de almacenamiento de los archivos como Google Cloud, S3, etc
+Mnemosyne destaca por aplicar estrategias optimizadas según el motor de base de datos (tanto lógicas como físicas e incrementales) e integrar notificaciones y auditoría completa del historial.
 
-Avisos por notificacion a traves de diversas aplicaciones y registro de logs para actividades de auditorias.
+---
 
-## Instalacion
+## 🚀 Características Principales
 
-Clona el repositorio de Github
+- **Múltiples Motores**: Soporte completo para **PostgreSQL**, **MySQL** y **SQLite**.
+- **Estrategias de Backup Inteligentes**:
+  - **PostgreSQL**: Backups físicos y unificación de cadenas de copias mediante `pg_combinebackup` (PostgreSQL 18+).
+  - **MySQL**: Copias de seguridad lógicas avanzadas y replicación incremental usando binlogs.
+  - **SQLite**: Generación optimizada de diferencias binarias a nivel de página (formato propio `.patch` de páginas modificadas) y su correspondiente reconstrucción diferencial.
+- **Almacenamiento en la Nube**: Carga directa y segura a **AWS S3** y **Azure Blob Storage** con autolimpieza local.
+- **Restauración en la Nube Automatizada**: Si se solicita la restauración de un backup remoto que no existe localmente, Mnemosyne lo descarga de forma automática, aplica la restauración y elimina de forma segura el archivo temporal del disco local.
+- **Interfaz de Usuario Premium**: Tablas estilizadas en consola y resúmenes interactivos mediante [Rich](https://github.com/Textualize/rich) y [colorama](https://pypi.org/project/colorama/).
+- **Historial de Auditoría**: Base de datos SQLite integrada (`data/data.db`) para auditar la duración, tamaño, estado (SUCCESS/FAILED) y errores detallados de cada backup.
 
-```
-git clone https://github.com/Jorge-Marco5/Mnemosyne.git
-cd Mnemosyne
-```
+---
 
-Inicio de entorno e instalacion de dependencias
+## 📦 Instalación
 
-```
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
+1.  **Clona el repositorio:**
 
-Configuracion de variables de entorno
+    ```bash
+    git clone https://github.com/Jorge-Marco5/Mnemosyne.git
+    cd Mnemosyne
+    ```
 
-```
-cp .env.example .env
-```
+2.  **Configura el entorno virtual e instala las dependencias:**
 
-Iniciar el proyecto
+    ```bash
+    python3 -m venv venv
+    source venv/bin/activate
+    pip install -r requirements.txt
+    ```
 
-```
-python main.py
-ó
-./mnemosyne.sh
-```
+3.  **Configura las variables de entorno:**
 
-## Uso
+    ```bash
+    cp .env.example .env
+    ```
 
-### Ayuda
+    _Edita el archivo `.env` para ingresar la llave maestra de encriptación (`BACKUP_MASTER_KEY`), credenciales de nubes (AWS/Azure) o Webhooks de notificaciones (Slack/Discord)._
 
-Muestra los multiples comandos y operaciones disponibles
+4.  **Otorga permisos de ejecución al script:**
+    ```bash
+    chmod +x mnemosyne.sh
+    ```
 
-```
+---
+
+## 🛠️ Guía de Uso y Comandos
+
+### 1. Ayuda General
+
+Muestra la lista de comandos disponibles:
+
+```bash
 ./mnemosyne.sh --help
 ```
 
-### Ayuda con comandos especificos
+O de un comando en específico:
 
-Musestra los distintos valores para un comando especifico
-
-```
+```bash
 ./mnemosyne.sh [comando] --help
 ```
 
-### Listado
+---
 
-Muestra las diferentes configuraciones guardadas de las bases de datos o de una en especifico
+### 2. Guardar Configuración (`save`)
 
-```
-./mnemosyne.sh list -a [alias]
-```
+Registra las credenciales de conexión de una base de datos. La contraseña es encriptada localmente de forma segura.
 
-### Guardado
-
-Guarda la configuracion de una base de datos para backups
-
-datos: obligatorios
-
-- motor de base de datos
-- alias (nombre identificador)
-- host
-- puerto
-- usuario
-- contraseña
-- nombre de la base de datos
-
-```
+```bash
 ./mnemosyne.sh save
 ```
 
-### Actualizar
+- **Datos obligatorios:** Motor de base de datos (`postgresql`, `mysql`, `sqlite`), alias único, host, puerto, usuario, contraseña y nombre de la base de datos.
 
-Actualiza la informacion de la configuracion de una base de datos
+---
 
+### 3. Listar Configuraciones (`list`)
+
+Muestra las bases de datos registradas en el sistema.
+
+```bash
+# Listar todas
+./mnemosyne.sh list
+
+# Consultar por alias específico
+./mnemosyne.sh list -a [alias]
 ```
-./mnemosyne.sh save -a [alias]
+
+---
+
+### 4. Verificar Conexión (`check`)
+
+Realiza una prueba de conexión en vivo con la base de datos asociada a un alias:
+
+```bash
+./mnemosyne.sh check -a [alias]
 ```
 
-### Eliminar
+---
 
-Elimina el registro de la configuracion de una base de datos
+### 5. Actualizar Configuración (`update`)
 
+Modifica los parámetros de conexión de una base de datos registrada:
+
+```bash
+./mnemosyne.sh update -a [alias]
 ```
+
+- _Nota: Presiona ENTER sobre cualquier campo para mantener su valor actual._
+
+---
+
+### 6. Eliminar Configuración (`delete`)
+
+Remueve una configuración de base de datos del sistema:
+
+```bash
 ./mnemosyne.sh delete -a [alias]
 ```
 
-### Copia de seguridad
+---
 
-Inicia el proceso de copia de seguridad para una base de datos.
+### 7. Ejecutar Copia de Seguridad (`start`)
 
+Realiza una copia de seguridad y opcionalmente la sube a almacenamiento externo.
+
+```bash
+# Guardar backup de forma local
+./mnemosyne.sh start -a [alias]
+
+# Crear backup y subir a AWS S3
+./mnemosyne.sh start -a [alias] -u aws-s3
+
+# Crear backup y subir a Azure Storage
+./mnemosyne.sh start -a [alias] -u azure-storage
 ```
-./mnemosyne.sh backup -a [alias]
-```
 
-### Restauracion
+---
 
-Inicia el proceso de restauracion de una base de datos.
+### 8. Restaurar Copia de Seguridad (`restore`)
 
-```
-# por alias
+Restaura una base de datos a partir de su historial de backups.
+_Si el backup está en la nube y no existe de forma local, el sistema lo descargará de manera automática y limpiará el archivo al terminar._
+
+```bash
+# Restaurar el último backup exitoso
 ./mnemosyne.sh restore -a [alias]
 
-# por fecha
-./mnemosyne.sh restore -d [fecha]
+# Restaurar el último backup exitoso antes de una fecha
+./mnemosyne.sh restore -a [alias] -d [AAAA-MM-DD]
 ```
+
+---
+
+### 9. Historial de Auditoría (`history` y `delete-history`)
+
+```bash
+# Consultar el historial de auditoría de todos los backups
+./mnemosyne.sh history
+
+# Limpiar todo el registro de auditoría
+./mnemosyne.sh delete-history
+```
+
+- _Eliminar el historial no borra los backups locales ni en la nube_
+- _no podra realizar un backup con este programa si no está registrado_
+
+---
+
+## ☁️ Almacenamiento Soportado
+
+- **AWS S3**: Agrega tus credenciales en `.env` (`AWS_ACCESS_KEY`, `AWS_SECRET_KEY`, `AWS_REGION`, `AWS_BUCKET_NAME`, `AWS_FOLDER_NAME`).
+- **Azure Blob Storage**: Configura tu cuenta y contenedor en `.env` (`AZURE_STORAGE_ACCOUNT`, `AZURE_STORAGE_KEY`, `AZURE_CONTAINER_NAME`).

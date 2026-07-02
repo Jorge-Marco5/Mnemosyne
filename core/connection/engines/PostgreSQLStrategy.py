@@ -12,7 +12,6 @@ class PostgreSQLStrategy(DBConnectionStrategy):
         if password is not None:
             env["PGPASSWORD"] = password
         
-        # Construir el comando psql
         # -h: host, -p: puerto, -U: usuario, -d: base de datos, -c: comando SQL
         comando = [
             "psql",

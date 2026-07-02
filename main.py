@@ -1,4 +1,4 @@
-from core.core import saveConfig, listConfigs, updateConfig, deleteConfig, checkConnection, showHistory, startBackup, restoreBackup
+from core.core import saveConfig, listConfigs, updateConfig, deleteConfig, checkConnection, showHistory, deleteHistory, startBackup, restoreBackup
 import argparse
 import sys
 
@@ -6,7 +6,6 @@ def main():
     parser = argparse.ArgumentParser(description="Herramienta CLI para copias de seguridad de base de datos.")
     subparsers = parser.add_subparsers(title="Funciones", dest="comando", help="Subcomandos disponibles")
 
-    # Configuraciones de Bases de datos
     parser_store = subparsers.add_parser("save", help="Guarda la configuracion de una nueva base de datos")
     parser_store.set_defaults(func=saveConfig)
 
@@ -32,8 +31,13 @@ def main():
     parser_history.add_argument("-s", "--status", help="Muestra el historial de copias de seguridad con el estado especificado")
     parser_history.set_defaults(func=showHistory)
 
+    parser_delete_history = subparsers.add_parser("delete-history", help="Elimina el historial de copias de seguridad")
+    parser_delete_history.set_defaults(func=deleteHistory)
+
+
     parser_start = subparsers.add_parser("start", help="Inicia una copia de seguridad")
     parser_start.add_argument("-a", "--alias", help="Alias de la configuracion a utilizar")
+    parser_start.add_argument("-u", "--upload", help="Sube la copia de seguridad a un servicio de almacenamiento externo (aws-s3, azure-storage)", choices=["aws-s3", "azure-storage"])
     parser_start.set_defaults(func=startBackup)
 
     parser_restore = subparsers.add_parser("restore", help="Restaura una copia de seguridad")

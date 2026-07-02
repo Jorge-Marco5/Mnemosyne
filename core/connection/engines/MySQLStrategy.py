@@ -12,7 +12,6 @@ class MySQLStrategy(DBConnectionStrategy):
         if password is not None:
             env["MYSQL_PWD"] = password
             
-        # Construir el comando mysql
         # -h: host, -P: puerto, -u: usuario, -D: base de datos, -e: ejecutar consulta
         comando = [
             "mysql",

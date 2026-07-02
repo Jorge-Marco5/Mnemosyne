@@ -13,7 +13,6 @@ HISTORY_FILE = Path(str(DATA_PATH), "data.db")
 class DataService:
     def __init__(self):
         """Inicializa la conexión a la base de datos de historial y crea la tabla si no existe."""
-        # Asegurar que el directorio config existe
         HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
         self.conn = sqlite3.connect(str(HISTORY_FILE))
         self._create_table()
@@ -21,7 +20,6 @@ class DataService:
     def _create_table(self):
         """Crea la tabla de historial si no existe."""
         cursor = self.conn.cursor()
-        # Execute each CREATE TABLE statement separately
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS configs (
@@ -114,6 +112,15 @@ class DataService:
         )
         return cursor.fetchone()
 
+    def show_last_info_by_date(self, alias: str, date: str):
+        """Obtiene la última configuración creada antes de una fecha específica."""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "SELECT id, engine, alias, host, port, user, password, db_name FROM configs WHERE alias = ? AND DATE(created_at) < ? ORDER BY created_at DESC LIMIT 1",
+            (alias, date,)
+        )
+        return cursor.fetchone()
+
     def update(self, data: dict):
         """Actualiza una configuración existente en la tabla de configuraciones."""
         cursor = self.conn.cursor()
@@ -195,10 +202,34 @@ class DataService:
             params.append(status.upper())
 
         query += " ORDER BY timestamp DESC LIMIT ?"
+
         params.append(limit)
 
         cursor.execute(query, params)
-        return cursor.fetchall()
+        data = cursor.fetchall()
+        #tratar los datos para que sean más legibles
+        formatted_data = []
+        for row in data:
+            formatted_row = list(row)
+            # Convertir timestamp a formato legible
+            formatted_row[1] = datetime.strptime(formatted_row[1], "%Y-%m-%d %H:%M:%S").strftime("%Y/%m/%d %H:%M:%S")
+            # Convertir a tiempo legible en segundos
+            formatted_row[5] = f"{formatted_row[5]:.2f} s"
+            # Convertir size_bytes a KB, MB o GB según corresponda
+            if formatted_row[6] is not None:
+                size = formatted_row[6]
+                if size < 1024:
+                    formatted_row[6] = f"{size} B"
+                elif size < 1024**2:
+                    formatted_row[6] = f"{size / 1024:.2f} KB"
+                elif size < 1024**3:
+                    formatted_row[6] = f"{size / (1024**2):.2f} MB"
+                else:
+                    formatted_row[6] = f"{size / (1024**3):.2f} GB"
+            else:
+                formatted_row[6] = "N/A"
+            formatted_data.append(formatted_row)
+        return formatted_data
 
     def get_latest_successful_backup(self, alias: str):
         """

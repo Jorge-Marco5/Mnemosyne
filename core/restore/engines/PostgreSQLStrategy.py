@@ -30,6 +30,5 @@ class PostgreSQLStrategy(DBRestoreStrategy):
 
         print(f"\nRestaurando base de datos PostgreSQL '{database}'...")
         subprocess.run(comando, env=env, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        # Limpiar el archivo .sql descomprimido
         os.remove(sql_file_path)
         return True

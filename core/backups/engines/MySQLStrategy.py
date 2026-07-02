@@ -4,18 +4,14 @@ import subprocess
 from pathlib import Path
 from datetime import datetime
 from core.compress import compressHandler
-from core.data_service import DataService
-
-historyHandler = DataService()
-
 
 class MySQLStrategy(DBBackupStrategy):
-    backup_path = os.getenv("BACKUPS_PATH")
+    backup_path = os.getenv("BACKUPS_PATH", "backups")
     path_base = Path(str(backup_path))
-    def backup(self, alias, host: str, port: int, user: str, password: str, database: str, backup_type: str = "full") -> str|None:
+
+    def backup(self, alias, upload_service: str, host: str, port: int, user: str, password: str, database: str, backup_type: str = "full") -> dict:
         """
         Realiza el proceso de copia de seguridad para MySQL.
-
         """
         start_time = datetime.now()
         str_date = start_time.strftime("%Y-%m-%d_%H-%M-%S")
@@ -27,71 +23,42 @@ class MySQLStrategy(DBBackupStrategy):
 
         out_path.mkdir(parents=True, exist_ok=True)
 
+        env = os.environ.copy()
+        if password is not None:
+            env["MYSQL_PWD"] = password
+
         comando = [
             "mysqldump",
             "-h", host,
             "-P", str(port),
             "-u", user,
-            f"-p{password}",
             database
         ]
 
         try:
             print(f"\nExtrayendo datos de MySQL ({database})...")
             with open(sql_path, "w", encoding="utf-8") as f_out:
-                subprocess.run(comando, stdout=f_out, stderr=subprocess.PIPE, check=True)
+                subprocess.run(comando, env=env, stdout=f_out, stderr=subprocess.PIPE, check=True)
 
-            final_path = compressHandler(sql_path, final_path)
+            file_path = compressHandler(sql_path, final_path)
             end_time = datetime.now()
             duration = end_time - start_time
-            file_size = os.path.getsize(final_path)
+            file_size = os.path.getsize(file_path) if file_path and os.path.exists(file_path) else 0
 
-            historyHandler.add_log(
-                alias=alias, 
-                engine="mysql", 
-                backup_type="FULL", 
-                duration_seconds=duration.total_seconds(), 
-                size_bytes=file_size, 
-                status="SUCCESS", 
-                file_path=str(final_path), 
-                storage_destination="local", 
-                error_message=None
-            )
-
-            return f"{final_path}"
+            return {
+                "alias": alias,
+                "engine": "mysql",
+                "backup_type": backup_type.upper(),
+                "duration_seconds": duration.total_seconds(),
+                "size_bytes": file_size,
+                "file_path": str(file_path) if file_path else None
+            }
         except subprocess.CalledProcessError as e:
-            end_time = datetime.now()
-            duration = end_time - start_time
             err_msg = e.stderr.decode('utf-8', errors='replace') if e.stderr else str(e)
-            historyHandler.add_log(
-                alias=alias, 
-                engine="mysql", 
-                backup_type="FULL", 
-                duration_seconds=duration.total_seconds(), 
-                size_bytes=0, 
-                status="FAILED", 
-                file_path=None, 
-                storage_destination=None, 
-                error_message=err_msg
-            )
-            if os.path.exists(sql_file):
-                os.remove(sql_file)
+            if sql_path.exists():
+                os.remove(sql_path)
             raise RuntimeError(f"Error en mysqldump: {err_msg}")
         except Exception as e:
-            end_time = datetime.now()
-            duration = end_time - start_time
-            err_msg = str(e)
-            historyHandler.add_log(
-                alias=alias, 
-                engine="mysql", 
-                backup_type="FULL", 
-                duration_seconds=duration.total_seconds(), 
-                size_bytes=0, 
-                status="FAILED", 
-                file_path=None, 
-                storage_destination=None, 
-                error_message=err_msg
-            )
-            if os.path.exists(sql_file):
-                os.remove(sql_file)
-            raise RuntimeError(f"Error en backup de MySQL: {err_msg}")
+            if sql_path.exists():
+                os.remove(sql_path)
+            raise RuntimeError(f"Error en backup de MySQL: {str(e)}")

@@ -20,3 +20,13 @@ class ServiceStorageHandler:
             raise ValueError(f"Servicio no soportado para carga: {service}")
         
         return strategy.upload(backup_file)
+
+    def download(self, service: str, remote_file_name: str, local_dest_path: str) -> bool:
+        """
+        Selecciona y ejecuta la estrategia de descarga para el motor de DB dado.
+        """
+        strategy = self._strategies.get(service)
+        if not strategy:
+            raise ValueError(f"Servicio no soportado para descarga: {service}")
+        
+        return strategy.download(remote_file_name, local_dest_path)

@@ -113,13 +113,40 @@ class DataService:
         return cursor.fetchone()
 
     def show_last_info_by_date(self, alias: str, date: str):
-        """Obtiene la última configuración creada antes de una fecha específica."""
+        """Obtiene el último backup exitoso antes de una fecha específica o igual a ella."""
         cursor = self.conn.cursor()
-        cursor.execute(
-            "SELECT id, engine, alias, host, port, user, password, db_name FROM configs WHERE alias = ? AND DATE(created_at) < ? ORDER BY created_at DESC LIMIT 1",
-            (alias, date,)
-        )
-        return cursor.fetchone()
+        query = """
+            SELECT id, timestamp, alias, engine, backup_type, duration_seconds, 
+                   size_bytes, status, file_path, storage_destination, error_message
+            FROM backup_history 
+            WHERE alias = ? AND status = 'SUCCESS' AND DATE(timestamp) <= ?
+            ORDER BY timestamp DESC 
+            LIMIT 1
+        """
+        cursor.execute(query, (alias, date))
+        row = cursor.fetchone()
+        if row:
+            formatted_row = list(row)
+            formatted_row[0] = str(formatted_row[0])
+            # Convertir timestamp a formato legible
+            formatted_row[1] = datetime.strptime(formatted_row[1], "%Y-%m-%d %H:%M:%S").strftime("%Y/%m/%d %H:%M:%S")
+            # Convertir a tiempo legible en segundos
+            formatted_row[5] = f"{formatted_row[5]:.2f} s"
+            # Convertir size_bytes a KB, MB o GB
+            if formatted_row[6] is not None:
+                size = formatted_row[6]
+                if size < 1024:
+                    formatted_row[6] = f"{size} B"
+                elif size < 1024**2:
+                    formatted_row[6] = f"{size / 1024:.2f} KB"
+                elif size < 1024**3:
+                    formatted_row[6] = f"{size / (1024**2):.2f} MB"
+                else:
+                    formatted_row[6] = f"{size / (1024**3):.2f} GB"
+            else:
+                formatted_row[6] = "N/A"
+            return formatted_row
+        return None
 
     def update(self, data: dict):
         """Actualiza una configuración existente en la tabla de configuraciones."""
@@ -237,13 +264,38 @@ class DataService:
         """
         cursor = self.conn.cursor()
         query = """
-            SELECT * FROM backup_history 
+            SELECT id, timestamp, alias, engine, backup_type, duration_seconds, 
+                   size_bytes, status, file_path, storage_destination, error_message
+            FROM backup_history 
             WHERE alias = ? AND status = 'SUCCESS'
             ORDER BY timestamp DESC 
             LIMIT 1
         """
         cursor.execute(query, (alias,))
-        return cursor.fetchone()
+        row = cursor.fetchone()
+        if row:
+            formatted_row = list(row)
+            formatted_row[0] = str(formatted_row[0])
+            # Convertir timestamp a formato legible
+            formatted_row[1] = datetime.strptime(formatted_row[1], "%Y-%m-%d %H:%M:%S").strftime("%Y/%m/%d %H:%M:%S")
+            # Convertir a tiempo legible en segundos
+            formatted_row[5] = f"{formatted_row[5]:.2f} s"
+            # Convertir size_bytes a KB, MB o GB según corresponda
+            if formatted_row[6] is not None:
+                size = formatted_row[6]
+                if size < 1024:
+                    formatted_row[6] = f"{size} B"
+                elif size < 1024**2:
+                    formatted_row[6] = f"{size / 1024:.2f} KB"
+                elif size < 1024**3:
+                    formatted_row[6] = f"{size / (1024**2):.2f} MB"
+                else:
+                    formatted_row[6] = f"{size / (1024**3):.2f} GB"
+            else:
+                formatted_row[6] = "N/A"
+            return formatted_row
+        return None
+
 
     def clear_history(self):
         """Elimina todos los registros del historial."""
